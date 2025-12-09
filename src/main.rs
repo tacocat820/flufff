@@ -156,7 +156,7 @@ fn main() {
 
                 if !(Path::new(&path).exists()) {
                     println!("> {} doesn't exist!", path.display());
-                    errors.push(format!("{} doesn't exist!", path.display()));
+                    errors.push(format!("{} doesn't exist! Remove it with flufff remove", path.display()));
 
                     ii += 1;
                     pb.set_position(ii);

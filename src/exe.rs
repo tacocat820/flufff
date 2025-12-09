@@ -24,9 +24,9 @@ pub fn run(cmd : &String, n : PathBuf, bar : &mut Option<&mut ProgressBar>) -> R
                 Ok(v) => v,
                 Err(_) => "".to_string(),
             });
-            if bar.is_some() {
+            /*if bar.is_some() {
                 bar.as_mut().unwrap().inc(1);
-            }
+            } */
         }
     }
 
