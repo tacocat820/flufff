@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 use std::io::{BufReader, BufRead};
 use indicatif::ProgressBar;
 
-pub fn run(cmd : &String, n : PathBuf, bar : &mut Option<&mut ProgressBar>) -> Result<bool, String> {
+pub fn run(cmd : &String, n : PathBuf, _bar : &mut Option<&mut ProgressBar>) -> Result<bool, String> {
     let mut run = match Command::new("bash")
             .current_dir(n)
             .arg("-c").arg(cmd)
