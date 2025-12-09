@@ -9,6 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 // TODO: make it so it doesn't panic
 // TODO: make parallel
+// TODO: add escape characters so you can include colons in the command 
 
 mod ini;
 mod exe;
