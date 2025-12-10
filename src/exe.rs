@@ -31,7 +31,7 @@ pub fn run(cmd : &String, n : PathBuf, _bar : &mut Option<&mut ProgressBar>) -> 
     }
 
     match run.wait() {
-        Ok(_) => { return Ok(true); },
-        Err(_) => { return Err("Failed".to_string()); },
+        Ok(_) => { Ok(true) },
+        Err(_) => { Err("Failed".to_string()) },
     }
 }

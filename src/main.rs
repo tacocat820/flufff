@@ -7,9 +7,8 @@ use std::path::Path;
 use directories::ProjectDirs;
 use indicatif::{ProgressBar, ProgressStyle};
 
-// TODO: make it so it doesn't panic
-// TODO: make parallel
 // TODO: add escape characters so you can include colons in the command 
+// TODO: add timer
 
 mod ini;
 mod exe;
@@ -34,12 +33,12 @@ fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut Progress
         cmd = cmd.replace(&format!("[{}]", i.0), i.1);
     }
 
-    match exe::run(&cmd, PathBuf::from(path), &mut Some(bar)) {
+    match exe::run(&cmd, path, &mut Some(bar)) {
         Ok(_) => {},
-        Err(v) => { panic!("Command failed! {}", v) },
+        Err(v) => { return Err(format!("Cannot update! {}", v)) },
     } 
 
-    return Ok(true);
+    Ok(true)
 
 }
 
@@ -61,7 +60,7 @@ fn main() {
     let mut args: Vec<String> = std::env::args().collect();
     args.remove(0);
 
-    if args.len() < 1 {
+    if args.is_empty() {
         println!("Expected an action ('new', 'remove', 'update')"); return;
     }
 
@@ -87,16 +86,16 @@ fn main() {
             
             if !types.contains_key(t) { println!("No such type!"); return; }
 
-            let var : Vec<&str> = types.get(t).expect("No such type!").get(0).expect("Incorrect config separation").split(',').collect();
+            let var : Vec<&str> = types.get(t).expect("No such type!").first().expect("Incorrect config separation").split(',').collect();
             let mut vars : HashMap<String, String> = HashMap::new();
             
             let mut info : String = String::new();
-            info += &format!("TYPE={}\n", t);
+            info += &format!("TYPE={}\n\n", t);
             let mut cmd = types.get(t).unwrap().get(1).expect("Incorrect config separation").to_string();
 
             let mut ii = 0;
             for i in var {
-                if i == "" { continue; }
+                if i.is_empty() { continue; }
                 let r = match args.get(3 + ii) {
                     Some(v) => { v },
                     None => { println!("Expected {}", i); return; },
@@ -112,7 +111,7 @@ fn main() {
 
             match exe::run(&cmd, PathBuf::from(n), &mut None) {
                 Ok(_) => {},
-                Err(v) => { panic!("Command failed! {}", v) },
+                Err(v) => { println!("Command failed! {}", v); return; },
             } 
 
             fs::write(format!("{}/INFO.ini", n), info).expect("Unable to make an info file");
@@ -121,9 +120,12 @@ fn main() {
             let canon = totrackpath.canonicalize().expect("Weird path");
             let add = canon.as_os_str().to_str().expect("Unable to convert name from os string to str");
 
+            let rawtrack = fs::read_to_string(&trackpath).expect("expected a 'track' file to exist");
+            track = rawtrack.split('\n').collect();
+
             if !track.contains(&add) { track.push(add); }
             
-            if track[0] == "" { track.remove(0); }
+            if track[0].is_empty() { track.remove(0); }
             fs::write(&trackpath, track.join("\n")).expect("Unable to modify the track file");
 
             println!("Finished!");
@@ -136,7 +138,7 @@ fn main() {
                 
                 println!("{} untracked!", n);
             } else {
-                println!("Not found! (use the absolute path please)")
+                println!("Not found! (use the absolute path please)"); return
             }
             
             fs::write(&trackpath, track.join("\n")).expect("Unable to modify the track file");
@@ -162,7 +164,7 @@ fn main() {
                     pb.set_position(ii);
                     continue;
                 }
-                println!("> Upgrading {}...", path.display());
+                println!("> Updating {}...", path.display());
 
                 match upd(path.clone(), &types, &mut pb) {
                     Ok(_) => {},
@@ -175,7 +177,7 @@ fn main() {
             }
 
             println!("-------------");
-            if errors.len() > 0 { println!("> Some backups failed!") }
+            if !errors.is_empty() { println!("> Some backups failed!") }
             for i in errors {
                 println!("- {}", i);
             }
@@ -184,7 +186,6 @@ fn main() {
         }
         _ => { 
             println!("No such subcommand!");
-            return;
         } 
     }
 

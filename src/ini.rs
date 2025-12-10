@@ -40,5 +40,5 @@ pub fn config(conf_path : PathBuf) -> Result<HashMap<String, HashMap<String, Str
         
     }
 
-   return Ok(result); 
+   Ok(result)
 }
