@@ -10,8 +10,12 @@ use indicatif::{ProgressBar, ProgressStyle};
 // TODO: add escape characters so you can include colons in the command 
 // TODO: add timer
 
+// TODO: config option keep backup (true/false)
+// TODO: config option to use archives by default
+
 mod ini;
 mod exe;
+mod targz;
 
 fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut ProgressBar) -> Result<bool, String> {
     let mut conf_path = path.clone(); conf_path.push("INFO.ini");
@@ -20,6 +24,10 @@ fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut Progress
         Ok(v) => v,
         Err(e) => { return Err(format!("Cannot find INFO.ini! {}", e)); },
     };
+
+    if conf.get("UPDATING").is_some() {
+        
+    }
 
     let t = match conf.get("").unwrap().get("TYPE") {
         Some(v) => v,
@@ -183,6 +191,12 @@ fn main() {
             }
 
             println!("Finished!");
+        }
+        "backup" => {
+            targz::zip().unwrap();
+        }
+        "backdown" => {
+            targz::unzip().unwrap();
         }
         _ => { 
             println!("No such subcommand!");

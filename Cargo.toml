@@ -5,5 +5,7 @@ edition = "2024"
 
 [dependencies]
 directories = "6.0.0"
+flate2 = "1.1.5"
 indicatif = "0.18.3"
+tar = "0.4.44"
 which = "8.0.0"
