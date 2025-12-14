@@ -1,5 +1,5 @@
 //use which::which;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File};
 use std::path::PathBuf;
 use std::fs;
 use std::path::Path;
@@ -20,14 +20,27 @@ mod targz;
 fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut ProgressBar) -> Result<bool, String> {
     let mut conf_path = path.clone(); conf_path.push("INFO.ini");
 
-    let conf = match ini::config(conf_path) {
+    let conf = match ini::config(conf_path.clone()) {
         Ok(v) => v,
         Err(e) => { return Err(format!("Cannot find INFO.ini! {}", e)); },
     };
 
     if conf.get("UPDATING").is_some() {
-        
+        println!("Unzipping an older version");
+        targz::unzip(PathBuf::from(path.clone())).unwrap();
+    } else {
+        targz::zip(PathBuf::from(path.clone())).unwrap();
     }
+    
+    let conf_raw = match fs::read_to_string(&conf_path) {
+        Ok(v) => v,
+        Err(_) => { return Err("Cannot read INFO.ini again!".to_string()) },
+    };
+    match fs::write(&conf_path, conf_raw + &format!("\nUPDATING=yes\n")) {
+        Ok(_) => {},
+        Err(e) => { return Err(format!("Error writing to INFO.ini! {}", e)); },
+    }
+    
 
     let t = match conf.get("").unwrap().get("TYPE") {
         Some(v) => v,
@@ -60,10 +73,13 @@ fn main() {
             .expect("Cannot create the conf.ini file!");
         fs::write(config.join("track"), "")
             .expect("Cannot create the track file!");
+        fs::write(config.join("lock"), "")
+            .expect("Cannot create the lock file!");
     }
 
     let confpath = config.join("conf.ini");
     let trackpath = config.join("track");
+    let lockpath = config.join("lock");
     
     let mut args: Vec<String> = std::env::args().collect();
     args.remove(0);
@@ -152,6 +168,18 @@ fn main() {
             fs::write(&trackpath, track.join("\n")).expect("Unable to modify the track file");
         }
         "update" => {
+            //let backup = conf[""].get("backup").unwrap_or("no")
+
+            let lock = match File::open(lockpath) {
+                Ok(v) => v,
+                Err(e) => { println!("Cannot open the lock file! {}", e); return; },
+            };
+            
+            match lock.lock() {
+                Ok(_) => {},
+                Err(e) => { println!("Is an update already running? {}", e) },
+            }
+
             let mut errors : Vec<String> = Vec::new();
             
             let mut pb = ProgressBar::new(track.len() as u64);
@@ -190,13 +218,18 @@ fn main() {
                 println!("- {}", i);
             }
 
+            match lock.unlock() {
+                Ok(_) => {},
+                Err(e) => {  println!("Finished but cannot unlock file! {}", e); return; },
+            }
+
             println!("Finished!");
         }
         "backup" => {
-            targz::zip().unwrap();
+            targz::zip(PathBuf::from("test")).unwrap();
         }
         "backdown" => {
-            targz::unzip().unwrap();
+            targz::unzip(PathBuf::from("test")).unwrap();
         }
         _ => { 
             println!("No such subcommand!");

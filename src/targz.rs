@@ -6,13 +6,15 @@ use flate2::read::GzDecoder;
 use flate2::Compression;
 use tar::Archive;
 
-pub fn zip() -> Result<File, String> {
-    if Path::new("BACKUP.tar.gz").exists() { match fs::remove_file("BACKUP.tar.gz") {
+pub fn zip(dir : PathBuf) -> Result<File, String> {
+    let back_path = dir.join("BACKUP.tar.gz");
+
+    if Path::new(&back_path).exists() { match fs::remove_file(&back_path) {
         Ok(_) => {},
         Err(v) => { println!("BACKUP.tar.gz exists but is impossible to remove: {}", v) },
     } }
     
-    let compressed_file = match File::create("BACKUP.tar.gz") {
+    let compressed_file = match File::create(&back_path) {
         Ok(v) => v,
         Err(e) => { return Err(e.to_string()) },
     };
@@ -22,7 +24,7 @@ pub fn zip() -> Result<File, String> {
     {
         let mut archive = Builder::new(&mut encoder);
 
-        let ls = match fs::read_dir("./") {
+        let ls = match fs::read_dir(dir) {
             Ok(v) => v,
             Err(e) => { return Err(format!("Error listing files: {}", e.to_string())) },
         };
@@ -53,10 +55,13 @@ pub fn zip() -> Result<File, String> {
 
 }
 
-pub fn unzip() -> Result<(), String> {
-    if !PathBuf::from("BACKUP.tar.gz").exists() { return Err("No BACKUP.tar.gz!".to_string()); }
+pub fn unzip(dir : PathBuf) -> Result<(), String> {
 
-    let ls = match fs::read_dir("./") {
+    let back_path = dir.join("BACKUP.tar.gz");
+    
+    if !back_path.exists() { return Err("No BACKUP.tar.gz!".to_string()); }
+
+    let ls = match fs::read_dir(&dir) {
         Ok(v) => v,
         Err(e) => { return Err(format!("Error listing files: {}", e.to_string())) },
     };
@@ -81,15 +86,13 @@ pub fn unzip() -> Result<(), String> {
         }
     }
 
-    let path = "BACKUP.tar.gz";
-
-    let tar_gz = match File::open(path) {
+    let tar_gz = match File::open(back_path) {
         Ok(v) => v,
         Err(e) => { return Err(e.to_string()) },
     };
     let tar = GzDecoder::new(tar_gz);
     let mut archive: Archive<GzDecoder<File>> = Archive::new(tar);
-    match archive.unpack(".") {
+    match archive.unpack(dir) {
         Ok(_) => { Ok(()) },
         Err(e) => { Err(e.to_string()) },
     }
