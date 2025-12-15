@@ -17,7 +17,7 @@ mod ini;
 mod exe;
 mod targz;
 
-fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut ProgressBar) -> Result<bool, String> {
+fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut ProgressBar, backup : bool) -> Result<bool, String> {
     let mut conf_path = path.clone(); conf_path.push("INFO.ini");
 
     let conf = match ini::config(conf_path.clone()) {
@@ -25,20 +25,28 @@ fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut Progress
         Err(e) => { return Err(format!("Cannot find INFO.ini! {}", e)); },
     };
 
-    if conf.get("UPDATING").is_some() {
-        println!("Unzipping an older version");
-        targz::unzip(PathBuf::from(path.clone())).unwrap();
+    let updating = path.join("UPDATING");
+    let is_updating;
+
+    if !updating.exists() {
+        match File::create(&updating) {
+            Ok(_) => {},
+            Err(e) => { return Err(format!("Cannot create an UPDATING file! {}", e)) },
+        }
+        is_updating = false;
     } else {
-        targz::zip(PathBuf::from(path.clone())).unwrap();
+        is_updating = true;
     }
-    
-    let conf_raw = match fs::read_to_string(&conf_path) {
-        Ok(v) => v,
-        Err(_) => { return Err("Cannot read INFO.ini again!".to_string()) },
-    };
-    match fs::write(&conf_path, conf_raw + &format!("\nUPDATING=yes\n")) {
-        Ok(_) => {},
-        Err(e) => { return Err(format!("Error writing to INFO.ini! {}", e)); },
+
+    if backup {
+        if is_updating { 
+            println!("Seems like the update has been terminated prematurely: Rolling back to the previous version");
+            targz::unzip(PathBuf::from(path.clone())).unwrap(); 
+        } else {
+            targz::zip(PathBuf::from(path.clone())).unwrap();
+        }
+    } else if is_updating {
+        println!("Seems like the update has been terminated prematurely");
     }
     
 
@@ -56,8 +64,13 @@ fn upd(path : PathBuf, types : &HashMap<&String, Vec<&str>>, bar : &mut Progress
 
     match exe::run(&cmd, path, &mut Some(bar)) {
         Ok(_) => {},
-        Err(v) => { return Err(format!("Cannot update! {}", v)) },
+        Err(e) => { return Err(format!("Cannot update! {}", e)) },
     } 
+
+    match fs::remove_file(updating) {
+        Ok(_) => {},
+        Err(e) => { return Err(format!("Cannot remove the UPDATING file! {}", e)) },
+    }
 
     Ok(true)
 
@@ -168,14 +181,18 @@ fn main() {
             fs::write(&trackpath, track.join("\n")).expect("Unable to modify the track file");
         }
         "update" => {
-            //let backup = conf[""].get("backup").unwrap_or("no")
+            let backup = match conf[""].get("backup").unwrap_or(&"no".to_string()).as_str() {
+                "yes" => true,
+                "no" => false,
+                _ => { println!("Config error: expected 'yes' or 'no' in 'backup'"); return; }
+            };
 
             let lock = match File::open(lockpath) {
                 Ok(v) => v,
                 Err(e) => { println!("Cannot open the lock file! {}", e); return; },
             };
             
-            match lock.lock() {
+            match lock.try_lock() {
                 Ok(_) => {},
                 Err(e) => { println!("Is an update already running? {}", e) },
             }
@@ -202,7 +219,7 @@ fn main() {
                 }
                 println!("> Updating {}...", path.display());
 
-                match upd(path.clone(), &types, &mut pb) {
+                match upd(path.clone(), &types, &mut pb, backup) {
                     Ok(_) => {},
                     Err(v) => { errors.push(format!("{} : {}", path.display(), v)); },
                 }
